@@ -1,0 +1,337 @@
+---
+output: 
+  html_document: 
+    theme: yeti
+  TOC: true
+  TOC_float: true
+author: ""
+date: " "
+title: "A Primer on Regression Analysis & Evaluation"
+number_sections: true
+
+#output:
+ # prettydoc::html_pretty:
+  #  theme: leonids
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+***
+
+
+
+The following is designed to be an overview of regression analysis as well as provide some insight into the statistical tests used to evaluate regression models.  This is not a comprehensive overview of this topic by any means, just a primer to provide you with a basic understanding of this type of analysis to accompany any class notes. This primer will focus on consumer demand and elasticity, and will estimate a demand curve (inverse) as an example.
+
+This primer will discuss the following:
+
+| __1. What is Regression Analysis?__ 
+
+| __2. How do we Evaluate our Regression Analysis?__
+|      __2.1. Evaluate the Model as a Whole__
+|           __2.1.1. F-test (p-value)__
+|           __2.1.2. R^2^ and Adjusted R^2^__
+|      __2.2. Evaluate the Individual Parameters/Coefficients__
+|           __2.2.1. T-test (p-value)__
+
+| __3. A Regression Analysis Cheat Sheet__
+
+<br>
+
+***
+
+## 1.	What is Regression Analysis?
+
+At a very basic level, regression analysis is simply a statistical modeling approach to ascertain the relationship among certain variables of interest.  This is best understood by example.
+
+Suppose we have a simple linear demand curve that takes the form of P = 20 – 4Q (note this is just a form of the equation Y = mX + b, which is the equation of a line).  Graphically, this equation represents the demand curve from our supply and demand analysis.  For our analysis, we are going to rewrite this equation in terms of the inverse demand representation (i.e. just rewrite the equation by solving for Q): Q = 5 – (¼)P, which is graphed accordingly.  
+
+<center>
+![Caption for the picture.](/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/Figure1.jpeg)
+</center>
+
+The nice interpretation here is that a 1 dollar increase in the price causes the quantity demanded to decrease by .25 units, or a 4 dollar increase in price causes the quantity demanded to decrease by 1 unit.  This interpretation is nothing more than describing the slope coefficient (this is the m in Y=mX + b form), which represents the rise/run or the ΔY/ΔX.  In this example, ΔY/ΔX is actually ΔQ/ΔP.  Theoretically, this is just the understanding of the equation for a line.
+
+So what does this have to do with regression analysis?  While the above theoretical example of a demand curve is nice and clean, how does this notion apply in the real world with actual data?
+
+We don’t have perfect linear demand curves in the real world, in fact, all we have if we are lucky enough to keep track, is a bunch of data that represents the combination of price and quantity points for a particular good/service over time.  For example, using the “where’s the beef.csv” data set provided, let’s plot out the monthly data for the price ($/lb.) and quantity (index 2001=100) of ground chuck roast from January 2001 through July 2005, with quantity on the vertical axis and price on the horizontal.
+
+<center>
+```{r echo=FALSE}
+library(ggplot2)
+
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+# Basic scatter plot
+ggplot(rawdata, aes(x=ChuckP, y=ChuckQ)) + geom_point() + theme_minimal() + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  xlab("Price of Ground Chuck") +
+  ylab("Quanity of Ground Chuck (index)")
+
+
+
+```
+</center>
+
+In the real world, this quantity and price relationship is represented by this collection of data points.  How do we reconcile this data with the nice, clean theoretical graph from the previous page?  If we want to estimate a demand curve for ground chuck roast, we need to find a line that best represents this data.  In fact we want to find a “line of best fit”.  
+
+The goal of regression analysis (at a very basic level) is to estimate that line!  
+
+So, how do we fit this line?  We want to minimize the distance between the observations (points) and the estimated regression line across the entire sample.  The distance between an observation and the regression line is the error or the residual.  The “line of best fit” is the line that minimizes the sum of these squared errors (why squared?  We want to treat positive and negative errors the same when summing, thus squaring removes the negative sign).
+
+<center>
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(ggpmisc)
+
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+formula1 <- y ~ x
+
+# Basic scatter plot
+ggplot(rawdata, aes(x=ChuckP, y=ChuckQ)) + geom_point() + theme_minimal() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+stat_smooth(method = "lm", col = "navyblue",se=FALSE, forumula=formula1) +
+stat_poly_eq(aes(label = paste(..eq.label.., sep = "~~~")), 
+               label.x.npc = "right", label.y.npc = 0.9,
+               eq.with.lhs = "italic(hat(y))~`=`~",
+               eq.x.rhs = "~italic(x)",
+               formula = formula1, parse = TRUE, size = 5)
+```
+</center>
+
+At the end of the day, all we are trying to do is estimate a line to represent this data.  In this case, the “line of best fit” is represented by the following equation:
+
+$$ Q^{CR} = 247.79 -56.74P^{CR} $$
+
+We can interpret the slope to say something about the relationship between P and Q.  Specifically, on average, a $1 increase in the price of ground chuck roast (per pound), leads to a 56.74 index point decrease in the quantity demanded of ground chuck roast.  This interpretation corresponds directly to the theoretical interpretation from the previous example, only now we derived a relationship for actual data.  That is regression analysis.
+
+***
+
+## 2. How do we Evaluate our Regression Analysis?
+
+Before delving into the details, we need to clarify some basic notation.  Every regression analysis consists of a model that has the following components: dependent variable, independent variables, parameters or coefficients, and an error term.  The model for the chuck roast example can be written as follows:
+
+$$ Q_t^{CR}= β_0+β_1 P_t^{CR}+e_t $$
+
+In this specification, the left-hand side variable is called the dependent variable (it depends on everything on the right-hand side), which is in this case is the $Q_t^{CR}$, or the quantity of ground chuck roast demanded.  The independent variable is $P_t^{CR}$, and this is the key variable in this model that we believe is going to impact the dependent variable.  This is ultimately the relationship we are trying to figure out in our analysis, how changes in $P_t^{CR}$ impact $Q_t^{CR}$.  The parameter estimates or coefficients are the $β_0$, $β_1$ in our model.  This is what we are trying to estimate from our regression analysis.  In this model, just like the equation of a line, $β_0$ represents the intercept, while $β_1$ represents the slope or more specifically the response of $Q_t^{CR}$ to a 1unit increase in $P_t^{CR}$. The $e_t$ term represents the error or residual in the model. If you look at the equation, once we estimate the model, we have values for $β_0$, $β_1$, and $P_t^{CR}$, which create the estimated regression line. However, the true value of $Q_t^{CR}$ for any given $P_t^{CR}$ is likely to contain some error, thus this represents the portion of $Q_t^{CR}$ that is not explained by the estimated line (this is the error from the previous graph).  Lastly, if you notice, each of the variables has a t subscript, this represents the fact that this analysis is a time-series analysis as we are tracking the data over time with 55 monthly observations.
+
+Now that we have some terminology down, let’s talk about how we evaluate a model once we have estimated a regression equation.
+
+## 2.1.	Evaluate the Model as a Whole
+
+There are two basic steps (for us in this primer) to evaluating a regression model.  First, we need to look at the F-test.  The F-test is used to test the statistical significance of the model (as a whole) and specifically answers the following question: does the model explain the deviations in the dependent variable (think of this as a yes or no question)?  After determining whether or not the model is an acceptable fit of the data from the F-test the second step is to look at the R^2^ and adjusted R^2^ statistics, which allow us to quantify how much of the variation in the dependent variable is explained by the variations in the independent variables (think of this as the follow-up to the F-test, where R^2^ tries to quantify how much of the variation the model explains).
+
+## 2.1.1. The F-test
+
+*What is it used for?*
+
+The F-test is used to test that statistical significance of the whole model.  Specifically, this test explores whether or not the estimated model can explain the variation in the dependent variable.  If the model cannot explain the variation, then it is not a good fit, and should not be used for the analysis.  In a sense, it tests whether or not R^2^ (see below for more information) is statistically different from zero, if it is statistically different, then the estimated model does indeed explain a portion of the variation in the dependent variable.
+
+*What exactly is the F-test testing?*
+
+The F-test explores the following hypotheses:
+
+Null (Default) Hypothesis: Model 1 $$ Q_t^{CR} = β_0  (i.e. β_1 = 0) $$
+
+Alternative Hypothesis: Model 2 $$ Q_t^{CR} = β_0 +  β_1 P_t^{CR} $$
+
+If we fail to reject the null hypothesis, then Model 1 is a better fit than Model 2.  If we reject the null hypothesis, then Model 2 is a better fit than Model 1.
+
+*How do we determine if we reject the null hypothesis?* 
+
+We will save the details of the F-statistic calculation for your analytics course, what you should know is that the larger the F-statistic the better (i.e. the larger the F-stat the more likely we can reject the null hypothesis).  For us, we can just examine the p-value to determine the statistical significance.  Typically, a p-value <.05, suggests that the model is significant at the 95% significance level, which implies that we can reject the null hypothesis (Model 2 is better fit than Model 1).  In layman’s terms, a p-value = .05 suggests that we are 95% certain that this result did not happen by chance, or there is no more than a 5% probability of observing this result due to chance.  
+
+*How do we apply the F-test to our analysis?*
+
+In the context of our ground chuck roast example, the following is the output for the estimated regression model, $Q_t^{CR} = β_0 + β_1 P_t^{CR} + e_t$, with the section containing the F-test results:
+
+<center>
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+# Run Basic Regression
+#model <- lm(data=rawdata, ChuckQ~ChuckP)
+#summary(model)
+
+
+# Cleaner Regression Output Table
+library(knitr)
+library(xtable)
+library(stargazer)
+
+model <- lm(ChuckQ~ChuckP, rawdata)
+modeloutput <- stargazer(model, title="Linear Regression of Ground Chuck Quantity on Prices", type = "html", align=FALSE, style="qje", single.row=TRUE, report=('vc*pt'))
+```
+</center>
+
+<br>
+
+In the context of this example, the p-value from the F-test is statistically significant at the 1% level, which suggests a rejection of the null hypothesis, and this estimated model is a better fit than the model without the independent variable.  In other words, this model does explain some of the deviations in the dependent variable.
+
+## 2.1.2.	The R^2^ and Adjusted R^2^ 
+
+The F-test tells us whether or not we can accept the model specification (i.e. that model 2 is a better fit than model 1 or vice versa), but it does not tell us how well the model fits the data, this is where R^2^ comes into play.
+
+### R^2^
+
+*What is it used for?*
+
+R^2^ is referred to as the coefficient of determination and is a measure of how well the overall estimating equation fits the data.  More specifically, this measure captures the proportion of the variation in the dependent variable that is explained by the variations in the independent variables.  
+
+*How do we apply the R^2^ to our analysis?*
+
+In the context of our example, this would tell us how much of the variation in the quantity of chuck roast is explained by the variation in the price of chuck roast.  Again, we will leave the actual calculation of R^2^ for your analytics course.
+
+
+<center>
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+# Run Basic Regression
+#model <- lm(data=rawdata, ChuckQ~ChuckP)
+#summary(model)
+
+
+# Cleaner Regression Output Table
+library(knitr)
+library(xtable)
+library(stargazer)
+
+model <- lm(ChuckQ~ChuckP, rawdata)
+modeloutput <- stargazer(model, title="Linear Regression of Ground Chuck Quantity on Prices", type = "html", align=FALSE, style="qje", single.row=TRUE, report=('vc*pt'))
+```
+</center>
+
+<br> 
+
+For our model, $Q_t^{CR} = β_0 +  β_1 P_t^{CR} + e_t$, the output  shows that the R^2^ is .247. This result suggests that 24.7% of the variation of the quantity demanded of chuck roast is explained by the model, which in this case is the one independent variable, the price of chuck roast.
+
+### Adjusted R^2^
+
+*What is the Adjusted R^2^ used for?* 
+
+Unfortunately, there is an issue with R^2^.  As we add independent variables to a given regression model, the R^2^ cannot decrease, because the existing independent variables already explain a portion of the variation in the dependent variable.  In theory, we could just simply add independent variables to the right-hand side until the entire variation is explained (i.e. as we add more variables to the right-hand side, the R^2^ will continue to rise until the entire variation is explained as R^2^ approaches 1).  The problem is that we can add any variable, regardless of whether or not it makes sense in the context of the model.
+
+*How do we apply the adjusted R^2^ to our analysis?*
+
+For example, suppose we expand our chuck roast model by adding a variable to the model, the average monthly precipitation in Luxembourg.  Now, given the size of the chuck roast market in the U.S., it is difficult to make a case that the amount of rain and snowfall in Luxembourg would have any reasonable impact on the U.S. chuck roast market.  It does not make logical sense to include this variable in our model.    However, if we estimate the following model: $Q_t^{CR} = β_0 + β_1 P_t^{CR} + β_2 R_t^{Lux} + e_t$, where $R_t^{Lux}$, represents our new variable, what impact would this have on our R^2^?
+
+
+<center>
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+# Run Basic Regression
+#model <- lm(data=rawdata, ChuckQ~ChuckP)
+#summary(model)
+
+
+# Cleaner Regression Output Table
+library(knitr)
+library(xtable)
+library(stargazer)
+
+model <- lm(ChuckQ~ChuckP+luxrain, rawdata)
+modeloutput <- stargazer(model, title="Linear Regression of Ground Chuck Quantity on Prices", type = "html", align=FALSE, style="qje", single.row=TRUE, report=('vc*pt'))
+```
+</center>
+
+<br>
+
+The output shows the R^2^ results from the estimated model containing the new variable for precipitation in Luxembourg.  In this model the R^2^ increased to .2593, which is more than a 1% increase in the R^2^ from the previous model without the new variable where R^2^ was .247.  Obviously, the addition of the new variable does not make intuitive sense, as there is no reason this should better explain the variation the quantity of chuck roast in the U.S.
+
+This is where the adjusted R^2^ comes into play.  This measure modifies the R^2^ calculation to account for the number of coefficients/parameters in the model.  The goal is to prevent you, as a researcher, from just throwing independent variables into a model to increase your R^2^. You should only add variables if they are important to the dependent variable of interest and backed by strong intuition or economic theory. The adjusted R^2^ helps us better explore this notion. 
+
+By adding an independent variable to a model it must have a meaningful impact on the R^2^, enough so that it can offset the loss of degrees of freedom by adding the variable.  Degrees of freedom is the number of observations minus the number of parameters or coefficients in the model. An important restriction of regression analysis as you cannot have more coefficients than you have observations. If we look at the two tables, the adjusted R^2^ numbers are reported below the R^2^ values.  In our example with the Luxembourg precipitation, we can see that the addition of this variable caused the R^2^ to increase (from .247 to .259), but it actually caused the adjusted R^2^ to decrease (from .2328 to .2308).  This result allows us to conclude that the addition of this variable, when controlling for its impact on the degrees of freedom, is not helpful in explaining the variation in the dependent variable.  
+
+*What do you need to know?*  
+
+It is better to look at the adjusted R^2^ than the regular R^2^, as this controls for the addition of new variables.  Also, the numerical interpretation of the adjusted R^2^ follows that of the regular R^2^.  
+
+Now that we have a basic understanding of how to evaluate a model as a whole, let’s switch focus to understanding how we can evaluate the individual parameters of a model.
+
+## 2.2.	Evaluate the Individual Parameters/Coefficients
+
+Once we get past the point of the model evaluation, the next step is typically to look at the relationships between the independent variables and the dependent variable.  This is, in fact, the point of the entire regression analysis, to explore these relationships (again we are just trying to calculate the slope parameter here so we can see how changes in the independent variable, change the dependent variable). Now we are going to analyze the individual parameters in the model, which are the βs in the model.
+
+In order to evaluate an individual parameter or coefficient, we will utilize the t-test.
+
+### 2.2.1. T-test
+
+*What it the t-test used for?*
+
+The ultimate goal of a t-test is to explore whether or not a parameter estimate is statistically significant, more specifically whether or not it is statistically different from zero.  If an estimate is not statistically different zero, then we must assume that it has no actual impact on the dependent variable.  If a parameter estimate is statistically significant than it is statistically different from zero and we can than interpret the coefficient accordingly.
+
+*What exactly is the t-test testing?*
+
+Specifically the t-test, explores the following hypotheses:
+
+Null (Default) Hypothesis:  	$β_1 = 0$ (the independent variable does not impact the dependent variable)
+
+Alternative Hypothesis: 		$β_1 ≠ 0$ (the independent variable does have an impact on the dependent variable)
+
+If we fail to reject the null hypothesis, then this suggests that the independent variable of interest does not impact the dependent variable because the coefficient is 0.  If we reject the null hypothesis, then we can say that the coefficient value is statistically different from 0 and we can proceed accordingly with the interpretation.
+
+*How do we determine if we reject the null hypothesis?* 
+
+Similar to the F-test, we will save the calculation of the t-statistic for the analytics course, but what you should know is that the larger the t-statistic (in absolute value), the more likely you are to find statistical significance or the more likely you are to reject the null hypothesis.  For us, we can just look at the p-values to ascertain the statistical significance.  Typically, a p-value <.05, suggests that the coefficient is statistically significant at the 95% significance level, which implies that we can reject the null hypothesis (the β of interest is indeed statistically different from 0).  In layman’s terms, a p-value = .05 suggests that we are 95% certain that this result did not happen by chance, or there is no more than a 5% probability of observing this result due to chance.  
+
+*How do we apply the t-test to our analysis?*
+
+In the context of our ground chuck roast example, the following is the output for the estimated regression model, $Q_t^{CR} = β_0 +  β_1 P_t^{CR} + e_t$, with the section containing the parameter estimates, the t-statistics, and the subsequent p-values.
+
+
+<center>
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Read Data
+rawdata <- read.csv("/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/wheres the beef.csv")
+
+# Run Basic Regression
+#model <- lm(data=rawdata, ChuckQ~ChuckP)
+#summary(model)
+
+
+# Cleaner Regression Output Table
+library(knitr)
+library(xtable)
+library(stargazer)
+
+model <- lm(ChuckQ~ChuckP, rawdata)
+modeloutput <- stargazer(model, title="Linear Regression of Ground Chuck Quantity on Prices", type = "html", align=FALSE, style="qje", single.row=TRUE, report=('vc*pt'))
+```
+</center>
+
+<br> 
+
+This is a very important component of your regression analysis, as this table presents the estimated model specification, as well as the statistical significance of the coefficients. The parameter estimates display the values for the βs in the model. Specifically, the estimated equation from this regression analysis is:
+
+$$ Q^{CR} = 247.79 -56.74P^{CR} $$
+
+Recall, our initial goal is to explore the relationship between the price of chuck roast and its impact on the quantity of chuck roast that is consumed.  The coefficient for the price of chuck roast is $β_1$=-56.74, which implies that, on average, a $1 increase in price causes the quantity of chuck roast demanded to fall by 56.74 index points.  This is the relationship we are looking for in regression analysis.
+
+So what does this have to do with the t-test?  The t-test ultimately tells us if we can interpret that β estimate.  If we look at the p-value for the $β_1$, the ChuckP coefficient, we see that the p-value=.0001, which suggests that this estimate ($β_1$=-56.74), is indeed statistically significant (since .0001<.05) using a 95% significance level threshold.  This implies that this number is statistically different from 0, and we can interpret this value as we did above.  However, if the p-value was greater than .05, then this coefficient would not be statistically significant (i.e. β is not statistically different from 0) and we would not be able to reject the null hypothesis. 
+
+What you need to know for this primer, is that we want to see p-values on coefficient/parameter estimates that are less than .05, which suggests statistical significance. If this is the case, then we can interpret the parameter estimate accordingly and can conclude that the independent variable has an impact on the dependent variable.  If that is not the case, then we conclude that this parameter is not different from 0 and this independent variable does not impact the dependent variable.
+
+*What is the difference between statistical significance and economic significance?*
+
+One of the most common mistakes that is made when working with regression analysis is the misinterpretation of the statistical significance of a coefficient to mean economic significance. If you look back at the t-test, if we find that the p-value is indeed statistically significant, all that tells us is that we can reject the null hypothesis, which simply states that this coefficient is statistically different from 0.  It says nothing about whether or not the size of the coefficient has any meaningful impact on the dependent variable when the independent variable increases.  
+
+Suppose in our previous example that the coefficient on the price of chuck roast was actually -.05 rather than -56.74, but it still had a p-value of .0001.  In terms of the t-test, this coefficient is statistically significant and is statistically different from 0.  However, the interpretation of this coefficient would be that a 1 dollar increase in the price of chuck roast (per pound), decreases the quantity of chuck roast consumed by .05 index points, or a 20 dollar increase in the price of chuck roast (per pound), would cause the quantity of chuck roast consumed to fall by 1 index point.  A quick look at the graph from earlier and we can see that the price of chuck roast per pound ranges from about 2.00 to 3.00 dollars, and the quantity index ranges from about 75 to 200.  Thus, in order to move the index by a small 1 index point, we would need the price of chuck roast to increase to $20/lb, which seems extremely unrealistic given the data.  Thus, this result is indeed statistically significant, but it has little economic significance in terms of its impact.  On the other hand, the actual result where this coefficient value was -56.74 has much more economic significance given its ability to impact the market.
+
+***
+
+## 3.	A Regression Analysis Evaluation Cheat Sheet
+
+The goal of this document is to give you a basic understanding of regression analysis and specifically key factors to assess when evaluating a given model.  There is a tremendous amount of complexity involved in this analysis that is beyond the scope of this course.  However, I have outlined below a short summary of what to look for when evaluating a model to provide a summary of this document.
+
+<center>
+![Caption for the picture.](/Volumes/Google Drive File Stream/My Drive/Teaching/Data Modules/Data Visualization/Tutorials/RegressionPrimer/Figure2.jpeg)
+</center>
