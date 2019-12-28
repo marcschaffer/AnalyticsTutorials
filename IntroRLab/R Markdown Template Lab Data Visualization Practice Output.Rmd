@@ -1,0 +1,45 @@
+---
+title: "Data Visualization Lab"
+author: "YOUR NAME HERE"
+date: "INSERT DATE HERE"
+output: pdf_document
+---
+
+```{r datasetup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+diamondsdf <- sample_n(diamonds, 500)
+```
+
+## Lab: Data Visualization Practice
+
+Below is the analysis of the data visualization exercise from the tutorial.
+
+### Plot 1:  What is the relationship between the carats of a diamond and its price?
+
+```{r plot1}
+
+# INSERT PLOT 1 CODE HERE
+
+```
+
+\newpage
+
+### Plot 2:  What is the relationship between the carats of a diamond and its price?
+
+```{r plot2}
+
+# INSERT PLOT 2 CODE HERE
+
+```
+
+\newpage
+
+### Plot 3:  What is the relationship between the carats of a diamond and its price?
+
+```{r plot3}
+
+# INSERT PLOT 3 CODE HERE
+
+```
